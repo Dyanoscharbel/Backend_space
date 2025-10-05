@@ -6,6 +6,7 @@ import { connectToDatabase, closeDatabase } from './config/database.js';
 import exoplanetsRoutes from './routes/exoplanets.js';
 import syncRoutes from './routes/sync.js';
 import chatRoutes from './routes/chat.js';
+import { GeminiChatbotService } from './services/geminiChatbotService.js';
 
 dotenv.config();
 
@@ -63,11 +64,21 @@ const startServer = async () => {
         // Connect to MongoDB
         await connectToDatabase();
         
+        // Initialize Gemini AI Chatbot
+        try {
+            GeminiChatbotService.initialize();
+            console.log('🤖 Gemini AI Chatbot initialized successfully');
+        } catch (error) {
+            console.error('⚠️ Warning: Gemini AI initialization failed:', error.message);
+            console.error('💡 Chatbot functionality will not be available');
+        }
+        
         // Start Express server
         app.listen(PORT, () => {
             console.log(`🚀 Exoplanets API Server running on http://localhost:${PORT}`);
             console.log(`🏥 Health check: http://localhost:${PORT}/health`);
             console.log(`🌌 Exoplanets API: http://localhost:${PORT}/api/exoplanets/system/Kepler-257`);
+            console.log(`🤖 Chatbot API: http://localhost:${PORT}/api/chat/send`);
         });
         
     } catch (error) {

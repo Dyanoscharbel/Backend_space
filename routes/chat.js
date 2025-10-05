@@ -99,6 +99,38 @@ router.get('/suggestions', (req, res) => {
 });
 
 /**
+ * GET /api/chat/health
+ * Check chatbot health and initialization status
+ */
+router.get('/health', (req, res) => {
+    try {
+        const isInitialized = GeminiChatbotService.model !== null;
+        const hasApiKey = !!process.env.GEMINI_API_KEY;
+        
+        res.json({
+            success: true,
+            data: {
+                chatbotStatus: isInitialized ? 'initialized' : 'not initialized',
+                hasApiKey,
+                model: isInitialized ? 'gemini-1.5-flash-8b' : null,
+                timestamp: new Date().toISOString()
+            }
+        });
+        
+        console.log(`✅ Chatbot health check - Initialized: ${isInitialized}, API Key: ${hasApiKey}`);
+        
+    } catch (error) {
+        console.error('❌ Error in chatbot health check:', error);
+        
+        res.status(500).json({
+            success: false,
+            error: 'Internal Server Error',
+            message: 'Failed to check chatbot health'
+        });
+    }
+});
+
+/**
  * POST /api/chat/conversation
  * Start a new conversation or continue existing one with full context
  * 

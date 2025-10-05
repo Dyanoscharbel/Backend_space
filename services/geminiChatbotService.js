@@ -12,13 +12,21 @@ export class GeminiChatbotService {
      */
     static initialize() {
         if (!process.env.GEMINI_API_KEY) {
-            throw new Error('GEMINI_API_KEY is required in environment variables');
+            throw new Error('GEMINI_API_KEY is required in environment variables. Please set your API key in the .env file.');
         }
         
-        this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        this.model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        if (!process.env.GEMINI_API_KEY.startsWith('AIza')) {
+            throw new Error('Invalid GEMINI_API_KEY format. API keys should start with "AIza".');
+        }
         
-        console.log('🤖 Gemini AI Chatbot initialized successfully');
+        try {
+            this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+            this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
+            
+            console.log('🤖 Gemini AI Chatbot initialized successfully');
+        } catch (error) {
+            throw new Error(`Failed to initialize Gemini AI: ${error.message}`);
+        }
     }
     
     /**
@@ -248,6 +256,7 @@ Include relevant links to help users explore topics further with official source
     static async generateResponse(userMessage, conversationHistory = []) {
         try {
             if (!this.model) {
+                console.log('🔄 Gemini model not initialized, attempting to initialize...');
                 this.initialize();
             }
             
@@ -294,7 +303,7 @@ Include relevant links to help users explore topics further with official source
             return {
                 message: text,
                 timestamp: new Date().toISOString(),
-                model: 'gemini-1.5-flash',
+                model: 'gemini-1.5-flash-8b',
                 hasExoplanetData: !!exoplanetContext,
                 links: relevantLinks
             };
@@ -325,7 +334,7 @@ Include relevant links to help users explore topics further with official source
             return {
                 message: fallbackMessage,
                 timestamp: new Date().toISOString(),
-                model: 'gemini-1.5-flash',
+                model: 'gemini-1.5-flash-8b',
                 links: fallbackLinks,
                 error: process.env.NODE_ENV === 'development' ? error.message : undefined
             };
