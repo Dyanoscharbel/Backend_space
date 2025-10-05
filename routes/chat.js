@@ -15,7 +15,8 @@ router.post('/send', async (req, res) => {
     try {
         const { message, conversationHistory = [] } = req.body;
         
-        console.log('💬 New chat message received');
+        console.log('💬 New chat message received:', message);
+        console.log('🌍 Origin:', req.headers.origin);
         
         // Validate input
         const validation = GeminiChatbotService.validateUserMessage(message);
@@ -259,6 +260,39 @@ router.get('/health', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Health check failed',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
+/**
+ * GET /api/chat/test
+ * Simple test endpoint to verify chatbot is working
+ */
+router.get('/test', async (req, res) => {
+    try {
+        console.log('🧪 Chatbot test endpoint called');
+        console.log('🌍 Origin:', req.headers.origin);
+        
+        const response = await GeminiChatbotService.generateResponse(
+            "Hello, this is a test message. Please respond with 'Chatbot is working!'",
+            []
+        );
+        
+        res.json({
+            success: true,
+            message: 'Chatbot test successful',
+            data: {
+                botResponse: response.reply,
+                timestamp: new Date().toISOString()
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Chatbot test failed:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Chatbot test failed',
             details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
