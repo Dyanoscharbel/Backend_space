@@ -21,9 +21,9 @@ export class GeminiChatbotService {
         
         try {
             this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
+            this.model = this.genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
             
-            console.log('🤖 Gemini AI Chatbot initialized successfully');
+            console.log('🤖 Gemini AI Chatbot initialized successfully with gemini-2.0-flash-exp');
         } catch (error) {
             throw new Error(`Failed to initialize Gemini AI: ${error.message}`);
         }
@@ -303,7 +303,7 @@ Include relevant links to help users explore topics further with official source
             return {
                 message: text,
                 timestamp: new Date().toISOString(),
-                model: 'gemini-1.5-flash-8b',
+                model: 'gemini-2.0-flash-exp',
                 hasExoplanetData: !!exoplanetContext,
                 links: relevantLinks
             };
@@ -334,7 +334,7 @@ Include relevant links to help users explore topics further with official source
             return {
                 message: fallbackMessage,
                 timestamp: new Date().toISOString(),
-                model: 'gemini-1.5-flash-8b',
+                model: 'gemini-2.0-flash-exp',
                 links: fallbackLinks,
                 error: process.env.NODE_ENV === 'development' ? error.message : undefined
             };
