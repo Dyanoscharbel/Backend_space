@@ -7,9 +7,10 @@ A comprehensive Node.js/Express backend API for managing exoplanet data from NAS
 - **NASA TAP API Integration**: Automatic synchronization with NASA's Exoplanet Archive
 - **AI Classification**: Machine Learning inference for exoplanet candidate validation
 - **MongoDB Storage**: Complete KOI (Kepler Objects of Interest) data management
-- **Automated Scheduling**: Cron-based hourly synchronization
+- **Automated Scheduling**: Cron-based weekly synchronization
 - **Planet Classification**: Automatic categorization into terrestrial, gas giant, extreme worlds, etc.
 - **Kepler Naming**: Automatic generation of Kepler names for confirmed exoplanets
+- **AI Chatbot**: Gemini-powered conversational AI for space and exoplanet questions
 - **RESTful API**: Comprehensive endpoints for data retrieval and system management
 
 ## 📋 Table of Contents
@@ -44,8 +45,23 @@ cp .env.example .env
 # Edit .env with your configuration
 ```
 
-4. **Start the server**
+4. **Add your Gemini API key** (required for chatbot functionality)
+```env
+GEMINI_API_KEY=your_actual_api_key_here
+```
+Get your key from: https://makersuite.google.com/app/apikey
+
+5. **Test the chatbot**
 ```bash
+npm run test:chatbot
+```
+
+6. **Start the server**
+```bash
+# Easy setup (Windows)
+npm run setup
+
+# Or manually:
 # Development mode
 npm run dev
 
@@ -70,6 +86,9 @@ DB_NAME=kepler_exoplanets
 
 # AI Inference API
 BACKEND_INFER_URL=http://localhost:5000/api/infer
+
+# Gemini AI Chatbot
+GEMINI_API_KEY=your_gemini_api_key_here
 
 # Scheduler Configuration
 AUTO_START_SYNC=false
@@ -119,51 +138,104 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
 
 #### `GET /api/exoplanets/search`
-**Description**: Search exoplanets with advanced filtering
+**Description**: Search for Kepler planetary systems by name
 
 **Query Parameters**:
-- `q` (string): Search term (Kepler name or system)
-- `classification` (string): Planet type filter
-- `disposition` (string): KOI disposition (CONFIRMED, CANDIDATE, FALSE POSITIVE)
-- `minRadius` (number): Minimum planet radius (Earth radii)
-- `maxRadius` (number): Maximum planet radius (Earth radii)
-- `minPeriod` (number): Minimum orbital period (days)
-- `maxPeriod` (number): Maximum orbital period (days)
-- `minTemp` (number): Minimum equilibrium temperature (K)
-- `maxTemp` (number): Maximum equilibrium temperature (K)
-- `page` (number): Page number (default: 1)
-- `limit` (number): Results per page (default: 20, max: 100)
-- `sortBy` (string): Sort field (default: koi_period)
-- `sortOrder` (string): Sort order (asc/desc, default: asc)
+- `q` (string): Search term (Kepler system name, e.g., "Kepler-442")
+- `limit` (number): Maximum number of systems to return (default: 50, max: 100)
 
 **Example**:
 ```
-GET /api/exoplanets/search?classification=terrestrial&minRadius=0.5&maxRadius=2&page=1&limit=10
+GET /api/exoplanets/search?q=Kepler-442&limit=10
 ```
 
 **Response**:
 ```json
 {
   "success": true,
-  "data": [...],
-  "pagination": {
-    "currentPage": 1,
-    "totalPages": 5,
-    "totalResults": 45,
-    "hasNext": true,
-    "hasPrevious": false
-  }
+  "data": {
+    "systems": [
+      {
+        "systemName": "Kepler-442",
+        "planetCount": 2,
+        "sampleData": {
+          "starMass": 0.61,
+          "starRadius": 0.60
+        }
+      }
+    ],
+    "totalFound": 1,
+    "searchTerm": "Kepler-442",
+    "limit": 10
+  },
+  "timestamp": "2025-10-05T14:30:00.000Z"
 }
 ```
 
 #### `GET /api/exoplanets/all`
-**Description**: Get all exoplanets with pagination
+**Description**: Get all exoplanets with complete data and automatic classification
 
 **Query Parameters**:
-- `page` (number): Page number (default: 1)
-- `limit` (number): Results per page (default: 50, max: 500)
-- `sortBy` (string): Sort field
-- `sortOrder` (string): Sort order (asc/desc)
+- `limit` (number): Results per page (default: 100, max: 1000)
+- `skip` (number): Number of results to skip for pagination (default: 0)
+- `status` (string): Filter by disposition (optional: 'CONFIRMED', 'CANDIDATE', 'FALSE POSITIVE')
+
+**Response**: Returns detailed exoplanet data including all NASA KOI fields plus automatic classification:
+```json
+{
+  "success": true,
+  "data": {
+    "exoplanets": [
+      {
+        // All original NASA KOI data (127+ fields)
+        "kepoi_name": "K00042.01",
+        "kepler_name": "Kepler-11 b",
+        "koi_disposition": "CONFIRMED",
+        "koi_period": 10.3039,
+        "koi_prad": 1.97,
+        "koi_teq": 1473,
+        "koi_steff": 5680,
+        "koi_smass": 0.95,
+        "koi_srad": 1.065,
+        
+        // AI Classification (if processed by AI)
+        "IS_AI": true,
+        "ai_prediction": "CONFIRMED",
+        "ai_confidence": 0.96,
+        
+        // Automatic Planet Classification
+        "classification": {
+          "type": "hot_super_earth",
+          "score": 0.89,
+          "habitabilityScore": 0.12
+        },
+        "planetType": "hot_super_earth",
+        "texture": "volcanic",
+        "description": "A super-Earth with extreme temperatures",
+        "confidence": 0.89,
+        
+        // Calculated fields
+        "systemName": "Kepler-11",
+        
+        // Metadata
+        "sync_source": "nasa_tap",
+        "sync_date": "2025-10-05T14:30:00.000Z"
+      }
+    ],
+    "pagination": {
+      "total": 9564,
+      "limit": 100,
+      "skip": 0,
+      "hasMore": true
+    },
+    "stats": {
+      "confirmed": 2456,
+      "candidates": 4789,
+      "falsePositives": 2319,
+      "total": 9564
+    }
+  }
+}
 
 #### `GET /api/exoplanets/classifications`
 **Description**: Get available planet classification types
@@ -190,6 +262,81 @@ GET /api/exoplanets/search?classification=terrestrial&minRadius=0.5&maxRadius=2&
 #### `GET /api/exoplanets/health`
 **Description**: Health check for exoplanets service
 
+### Chat Routes
+
+#### `POST /api/chat/send`
+**Description**: Send a message to the AI chatbot and get a response about space and exoplanets
+
+**Request Body**:
+```json
+{
+  "message": "What are exoplanets?",
+  "conversationHistory": [
+    {
+      "role": "user",
+      "content": "Hello"
+    },
+    {
+      "role": "assistant", 
+      "content": "Hi! I'm here to help you learn about space and exoplanets! 🚀"
+    }
+  ]
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "userMessage": "What are exoplanets?",
+    "botResponse": "Exoplanets are planets that orbit stars outside our solar system! 🪐 Since the first confirmed discovery in 1995, we've found thousands of these fascinating worlds using missions like Kepler...",
+    "timestamp": "2025-10-05T14:30:00.000Z",
+    "model": "gemini-1.5-flash",
+    "hasExoplanetData": true
+  }
+}
+```
+
+#### `GET /api/chat/suggestions`
+**Description**: Get suggested questions to ask the chatbot
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "suggestions": [
+      "What are exoplanets and how are they discovered? 🔭",
+      "Tell me about the Kepler space telescope mission 🚀",
+      "What makes a planet potentially habitable? 🌍",
+      "Tell me about Kepler-442 system"
+    ],
+    "count": 10
+  }
+}
+```
+
+#### `POST /api/chat/conversation`
+**Description**: Manage a full conversation with context
+
+**Request Body**:
+```json
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello",
+      "timestamp": "2025-10-05T14:00:00.000Z"
+    }
+  ],
+  "newMessage": "What's the most interesting exoplanet?"
+}
+```
+
+#### `GET /api/chat/health`
+**Description**: Health check for chatbot service
+
 ### Synchronization Routes
 
 #### `GET /api/sync/status`
@@ -214,8 +361,8 @@ GET /api/exoplanets/search?classification=terrestrial&minRadius=0.5&maxRadius=2&
     "scheduler": {
       "isActive": true,
       "isRunning": false,
-      "lastRun": "2025-10-05T13:00:00Z",
-      "nextRun": "2025-10-05T15:00:00Z",
+      "lastRun": "2025-09-29T02:00:00Z",
+      "nextRun": "2025-10-06T02:00:00Z",
       "timezone": "Europe/Paris"
     },
     "nasa": {
@@ -251,7 +398,7 @@ GET /api/exoplanets/search?classification=terrestrial&minRadius=0.5&maxRadius=2&
 ```
 
 #### `POST /api/sync/scheduler/start`
-**Description**: Start automatic hourly synchronization
+**Description**: Start automatic weekly synchronization (every Sunday at 2:00 AM)
 
 #### `POST /api/sync/scheduler/stop`
 **Description**: Stop automatic synchronization
@@ -265,8 +412,8 @@ GET /api/exoplanets/search?classification=terrestrial&minRadius=0.5&maxRadius=2&
 **Request Body**:
 ```json
 {
-  "cronPattern": "0 */6 * * *",
-  "timezone": "UTC"
+  "cronPattern": "0 2 * * 0",
+  "timezone": "Europe/Paris"
 }
 ```
 
@@ -311,7 +458,7 @@ GET /api/exoplanets/search?classification=terrestrial&minRadius=0.5&maxRadius=2&
 - **Error Handling**: Robust timeout and error management
 
 ### SchedulerService
-- **Cron Scheduling**: Automated hourly synchronization
+- **Cron Scheduling**: Automated weekly synchronization (every Sunday at 2:00 AM)
 - **Manual Triggers**: On-demand synchronization
 - **Status Monitoring**: Real-time scheduler status
 - **Custom Patterns**: Configurable cron schedules
@@ -325,6 +472,13 @@ GET /api/exoplanets/search?classification=terrestrial&minRadius=0.5&maxRadius=2&
 - **Automatic Classification**: Categorizes planets based on physical properties
 - **Scoring System**: Habitability and classification scores
 - **Multiple Categories**: Terrestrial, gas giants, extreme worlds, etc.
+
+### GeminiChatbotService
+- **AI-Powered Chat**: Gemini 1.5 Flash model for natural language responses
+- **Space Expertise**: Specialized knowledge about exoplanets and astronomy
+- **Real Data Integration**: Uses live NASA KOI data to provide accurate information
+- **Context Awareness**: Maintains conversation history for coherent interactions
+- **Smart Suggestions**: Provides relevant questions to guide user exploration
 
 ## 🗄️ Database Schema
 
@@ -427,6 +581,28 @@ console.log('Sync completed:', result.stats);
 const response = await fetch('http://localhost:3001/api/sync/scheduler/start', {
   method: 'POST'
 });
+```
+
+### Using the AI Chatbot
+```javascript
+// Send a message to the chatbot
+const response = await fetch('http://localhost:3001/api/chat/send', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    message: "What makes Kepler-442 b potentially habitable?",
+    conversationHistory: []
+  })
+});
+const data = await response.json();
+console.log('Bot response:', data.data.botResponse);
+
+// Get suggested questions
+const suggestions = await fetch('http://localhost:3001/api/chat/suggestions');
+const suggestionsData = await suggestions.json();
+console.log('Suggested questions:', suggestionsData.data.suggestions);
 ```
 
 ## 🔬 Development

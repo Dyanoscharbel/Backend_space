@@ -29,6 +29,7 @@ export class ExoplanetService {
                 koi_prad: 1,      // Planet radius (R⊕)
                 koi_teq: 1,       // Temperature (K)
                 koi_sma: 1,       // Planet-star distance (AU)
+                koi_period: 1,    // Orbital period (days)
                 koi_smass: 1,     // Star mass (M☉)
                 koi_srad: 1,      // Star radius (R☉)
                 _id: 0
@@ -56,6 +57,8 @@ export class ExoplanetService {
                 const classification = ExoplanetClassificationService.classifyExoplanet(exoplanet);
                 
                 // Data validation and cleaning
+                const orbitalPeriod = this.validateNumber(exoplanet.koi_period, null);
+                
                 const processedData = {
                     // Basic information
                     name: exoplanet.kepler_name || `${keplerName}-${index + 1}`,
@@ -65,6 +68,7 @@ export class ExoplanetService {
                     radius: this.validateNumber(exoplanet.koi_prad, 1.0), // R⊕
                     temperature: this.validateNumber(exoplanet.koi_teq, 288), // K
                     distance: this.validateNumber(exoplanet.koi_sma, 1.0), // AU
+                    ...(orbitalPeriod && { orbitalPeriod }), // Only include if not null
                     
                     // Star properties
                     starMass: this.validateNumber(exoplanets[0].koi_smass, 1.0), // M☉

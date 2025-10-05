@@ -9,18 +9,18 @@ export class SchedulerService {
     static nextRun = null;
     
     /**
-     * Starts the hourly synchronization task
+     * Starts the weekly synchronization task
      */
-    static startHourlySync() {
+    static startWeeklySync() {
         if (this.syncTask) {
             console.log('⚠️ Synchronization task is already running');
             return;
         }
         
-        console.log('⏰ Starting NASA synchronization scheduler (every hour)');
+        console.log('⏰ Starting NASA synchronization scheduler (every week)');
         
-        // Schedule task every hour (at minute 0)
-        this.syncTask = cron.schedule('0 * * * *', async () => {
+        // Schedule task every week (Sunday at 2:00 AM)
+        this.syncTask = cron.schedule('0 2 * * 0', async () => {
             await this.executeSyncTask();
         }, {
             scheduled: true,
@@ -56,7 +56,7 @@ export class SchedulerService {
         this.lastRun = new Date();
         
         try {
-            console.log('🌌 === STARTING HOURLY SYNCHRONIZATION ===');
+            console.log('🌌 === STARTING WEEKLY SYNCHRONIZATION ===');
             
             // Execute synchronization
             const stats = await NasaSyncService.synchronizeKOIData();
@@ -97,7 +97,7 @@ export class SchedulerService {
     /**
      * Stops the synchronization task
      */
-    static stopHourlySync() {
+    static stopWeeklySync() {
         if (this.syncTask) {
             this.syncTask.destroy();
             this.syncTask = null;
@@ -110,9 +110,9 @@ export class SchedulerService {
     /**
      * Restarts the synchronization task
      */
-    static restartHourlySync() {
-        this.stopHourlySync();
-        this.startHourlySync();
+    static restartWeeklySync() {
+        this.stopWeeklySync();
+        this.startWeeklySync();
     }
     
     /**
@@ -120,11 +120,18 @@ export class SchedulerService {
      */
     static updateNextRunTime() {
         if (this.syncTask) {
-            // Calculate the next hour
+            // Calculate the next Sunday at 2:00 AM
             const now = new Date();
-            const nextHour = new Date(now);
-            nextHour.setHours(now.getHours() + 1, 0, 0, 0);
-            this.nextRun = nextHour;
+            const nextSunday = new Date(now);
+            const daysUntilSunday = (7 - now.getDay()) % 7;
+            if (daysUntilSunday === 0 && now.getHours() >= 2) {
+                // If it's Sunday and past 2 AM, schedule for next Sunday
+                nextSunday.setDate(now.getDate() + 7);
+            } else {
+                nextSunday.setDate(now.getDate() + daysUntilSunday);
+            }
+            nextSunday.setHours(2, 0, 0, 0);
+            this.nextRun = nextSunday;
         } else {
             this.nextRun = null;
         }
@@ -149,7 +156,7 @@ export class SchedulerService {
             lastRun: this.lastRun,
             nextRun: this.nextRun,
             timezone: 'Europe/Paris',
-            cronPattern: '0 * * * *', // Every hour
+            cronPattern: '0 2 * * 0', // Every Sunday at 2:00 AM
             uptime: this.syncTask ? Date.now() - (this.lastRun?.getTime() || Date.now()) : 0
         };
     }
@@ -187,10 +194,23 @@ export class SchedulerService {
             return false;
         }
     }
+
+    // Backward compatibility methods (keep old method names)
+    static startHourlySync() {
+        return this.startWeeklySync();
+    }
+
+    static stopHourlySync() {
+        return this.stopWeeklySync();
+    }
+
+    static restartHourlySync() {
+        return this.restartWeeklySync();
+    }
 }
 
 // Auto-start scheduler if environment variable is defined
 if (process.env.AUTO_START_SYNC === 'true') {
     console.log('🚀 Auto-starting the synchronization scheduler...');
-    SchedulerService.startHourlySync();
+    SchedulerService.startWeeklySync();
 }

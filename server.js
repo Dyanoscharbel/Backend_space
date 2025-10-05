@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { connectToDatabase, closeDatabase } from './config/database.js';
 import exoplanetsRoutes from './routes/exoplanets.js';
 import syncRoutes from './routes/sync.js';
+import chatRoutes from './routes/chat.js';
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/exoplanets', exoplanetsRoutes);
 app.use('/api/sync', syncRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
