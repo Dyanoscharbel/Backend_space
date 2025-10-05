@@ -17,9 +17,9 @@ const connectToDatabase = async () => {
             await client.connect();
             console.log('✅ Connected to MongoDB');
             
-            // Base de données Kepler
+            // Kepler database
             db = client.db('kepler_database');
-            console.log('📚 Base de données: kepler_database');
+            console.log('📚 Database: kepler_database');
             console.log('📦 Collection: koi_objects');
         }
         
