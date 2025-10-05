@@ -118,7 +118,7 @@ router.get('/search', async (req, res) => {
  * Retrieve all exoplanets from the database (regardless of their status)
  * 
  * Query params:
- * - limit: max number of results (default: 100, max: 1000)
+ * - limit: max number of results (default: 100, max: 10000)
  * - skip: number of elements to skip for pagination (default: 0)
  * - status: filter by status (optional: 'CONFIRMED', 'CANDIDATE', 'FALSE POSITIVE')
  */
@@ -130,7 +130,7 @@ router.get('/all', async (req, res) => {
             status 
         } = req.query;
         
-        const limitNum = Math.min(parseInt(limit) || 100, 1000); // Max 1000 results
+        const limitNum = Math.min(parseInt(limit) || 100, 10000); // Max 10000 results pour récupérer toutes les données
         const skipNum = Math.max(parseInt(skip) || 0, 0);
         
         console.log(`🌍 Request for all exoplanets - limit: ${limitNum}, skip: ${skipNum}, status: ${status || 'all'}`);
@@ -197,6 +197,50 @@ router.get('/classifications', async (req, res) => {
 });
 
 /**
+ * GET /api/exoplanets/:id
+ * Retrieve a specific exoplanet by ID
+ */
+router.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Parameter validation
+        if (!id) {
+            return res.status(400).json({
+                error: 'Bad Request',
+                message: 'Exoplanet ID is required'
+            });
+        }
+        
+        console.log(`🔍 Request for exoplanet ID: ${id}`);
+        
+        // Try to find exoplanet by MongoDB _id or other identifier
+        const exoplanet = await ExoplanetService.getExoplanetById(id);
+        
+        if (!exoplanet) {
+            return res.status(404).json({
+                error: 'Not Found',
+                message: `Exoplanet with ID '${id}' not found`,
+                id: id
+            });
+        }
+        
+        res.json({
+            success: true,
+            data: exoplanet,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching exoplanet by ID:', error);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            message: 'Failed to retrieve exoplanet data'
+        });
+    }
+});
+
+/**
  * GET /api/exoplanets/health
  * Exoplanets API health check
  */
@@ -206,6 +250,7 @@ router.get('/health', (req, res) => {
         service: 'Exoplanets API',
         status: 'OK',
         endpoints: [
+            'GET /api/exoplanets/:id',
             'GET /api/exoplanets/system/:keplerName',
             'GET /api/exoplanets/search',
             'GET /api/exoplanets/all',

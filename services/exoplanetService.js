@@ -311,6 +311,62 @@ export class ExoplanetService {
     }
     
     /**
+     * Retrieve a specific exoplanet by ID
+     * @param {string} id - MongoDB ObjectId or other identifier
+     * @returns {Promise<Object|null>} Exoplanet data or null if not found
+     */
+    static async getExoplanetById(id) {
+        try {
+            const db = getDatabase();
+            const collection = db.collection('koi_objects');
+            
+            console.log(`🔍 Searching for exoplanet with ID: ${id}`);
+            
+            // Try to find by MongoDB ObjectId first
+            let query;
+            try {
+                // If it's a valid ObjectId format
+                if (id.match(/^[0-9a-fA-F]{24}$/)) {
+                    const { ObjectId } = await import('mongodb');
+                    query = { _id: new ObjectId(id) };
+                } else {
+                    // Otherwise search by other possible identifiers
+                    query = {
+                        $or: [
+                            { kepoi_name: id },
+                            { kepler_name: id },
+                            { koi_name: id }
+                        ]
+                    };
+                }
+            } catch (error) {
+                // If ObjectId import fails, use string-based search
+                query = {
+                    $or: [
+                        { kepoi_name: id },
+                        { kepler_name: id },
+                        { koi_name: id }
+                    ]
+                };
+            }
+            
+            const exoplanet = await collection.findOne(query);
+            
+            if (exoplanet) {
+                console.log(`✅ Found exoplanet: ${exoplanet.kepoi_name || exoplanet.kepler_name || id}`);
+            } else {
+                console.log(`❌ No exoplanet found with ID: ${id}`);
+            }
+            
+            return exoplanet;
+            
+        } catch (error) {
+            console.error('❌ Error retrieving exoplanet by ID:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Extract the system name from the full exoplanet name
      * Ex: "Kepler-11 b" -> "Kepler-11"
      * Ex: "Kepler-442 c" -> "Kepler-442"
