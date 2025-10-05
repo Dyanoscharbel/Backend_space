@@ -15,7 +15,10 @@ const PORT = process.env.PORT || 3001;
 // Middlewares
 app.use(helmet());
 app.use(cors({
-  origin: 'https://nyx-a-ifront-q25a.vercel.app', // ton frontend Vercel
+  origin: [
+    'https://nyx-a-ifront-q25a.vercel.app',
+    'https://visualize3-d.vercel.app'
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
