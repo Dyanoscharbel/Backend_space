@@ -1,5 +1,5 @@
 import express from 'express';
-// import cors from 'cors'; // CORS désactivé
+import cors from 'cors'; // CORS désactivé
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { connectToDatabase, closeDatabase } from './config/database.js';
@@ -14,11 +14,12 @@ const PORT = process.env.PORT || 3001;
 
 // Middlewares
 app.use(helmet());
-// CORS désactivé - Commenté par demande utilisateur
-// app.use(cors({
-//     origin: ['http://localhost:5173', 'http://localhost:5175', 'http://localhost:3000', 'http://127.0.0.1:5173'],
-//     credentials: true
-// }));
+app.use(cors({
+  origin: 'https://nyx-a-ifront-q25a.vercel.app', // ton frontend Vercel
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
