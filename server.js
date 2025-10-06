@@ -18,7 +18,7 @@ app.use(helmet());
 app.use(cors({
   origin: [
     'https://nyx-a-ifront-q25a.vercel.app',
-    'https://visualize3-d.vercel.app'
+    'https://visualize3-d.vercel.app','http://localhost:3000/'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
