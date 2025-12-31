@@ -89,20 +89,27 @@ const startServer = async () => {
             console.error('💡 Chatbot functionality will not be available');
         }
         
-        // Initialize Email Service
-        try {
-            await EmailService.initialize();
-        } catch (error) {
+        // Initialize Email Service (non-blocking)
+        EmailService.initialize().catch(error => {
             console.error('⚠️ Warning: Email service initialization failed:', error.message);
             console.error('💡 Email notifications will not be available');
-        }
+        });
         
         // Start Express server
-        app.listen(PORT, '0.0.0.0', () => {
+        console.log(`📡 Attempting to start server on port ${PORT}...`);
+        const server = app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Exoplanets API Server running on port ${PORT}`);
             console.log(`🏥 Health check: /health`);
             console.log(`🌌 Exoplanets API: /api/exoplanets/system/Kepler-257`);
             console.log(`🤖 Chatbot API: /api/chat/send`);
+        });
+
+        server.on('error', (error) => {
+            console.error('❌ Server failed to start:', error);
+            if (error.code === 'EADDRINUSE') {
+                console.error(`Port ${PORT} is already in use`);
+            }
+            process.exit(1);
         });
         
     } catch (error) {
