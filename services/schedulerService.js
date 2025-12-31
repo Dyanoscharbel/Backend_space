@@ -33,20 +33,25 @@ export class SchedulerService {
     
     /**
      * Starts an immediate synchronization (for testing)
+     * @param {boolean} forceFullSync - Force full sync instead of incremental
      */
-    static async runSyncNow() {
+    static async runSyncNow(forceFullSync = false) {
         if (this.isRunning) {
             throw new Error('A synchronization is already in progress');
         }
         
         console.log('🚀 Executing immediate synchronization...');
-        return await this.executeSyncTask();
+        if (forceFullSync) {
+            console.log('🔄 Full synchronization mode');
+        }
+        return await this.executeSyncTask(forceFullSync);
     }
     
     /**
      * Executes the synchronization task
+     * @param {boolean} forceFullSync - Force full sync instead of incremental
      */
-    static async executeSyncTask() {
+    static async executeSyncTask(forceFullSync = false) {
         if (this.isRunning) {
             console.log('⚠️ Synchronization already in progress, skipping');
             return;
@@ -56,10 +61,15 @@ export class SchedulerService {
         this.lastRun = new Date();
         
         try {
-            console.log('🌌 === STARTING WEEKLY SYNCHRONIZATION ===');
+            console.log('🌌 === STARTING SYNCHRONIZATION ===');
+            if (forceFullSync) {
+                console.log('🔄 MODE: FULL SYNC');
+            } else {
+                console.log('🔄 MODE: INCREMENTAL (will resume if needed)');
+            }
             
             // Execute synchronization
-            const stats = await NasaSyncService.synchronizeKOIData();
+            const stats = await NasaSyncService.synchronizeKOIData(forceFullSync);
             
             // Save the statistics
             await NasaSyncService.saveSyncStats(stats);

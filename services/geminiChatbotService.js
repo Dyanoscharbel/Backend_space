@@ -21,9 +21,9 @@ export class GeminiChatbotService {
         
         try {
             this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            this.model = this.genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+            this.model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
             
-            console.log('🤖 Gemini AI Chatbot initialized successfully with gemini-2.0-flash-exp');
+            console.log('🤖 Gemini AI Chatbot initialized successfully with gemini-2.5-flash');
         } catch (error) {
             throw new Error(`Failed to initialize Gemini AI: ${error.message}`);
         }
@@ -36,6 +36,14 @@ export class GeminiChatbotService {
         return `
 You are an expert space and exoplanet assistant with access to NASA's Kepler mission data. 
 You help users learn about space, exoplanets, astronomy, and the search for life beyond Earth.
+
+LANGUAGE ADAPTATION:
+- **ALWAYS respond in the SAME LANGUAGE as the user's message**
+- If the user writes in English, respond in English
+- If the user writes in French, respond in French
+- If the user writes in another language, respond in that language
+- Maintain natural, fluent language in whatever language you use
+- Do NOT mix languages in your response
 
 KNOWLEDGE BASE:
 - You have access to thousands of exoplanets from NASA's Kepler mission

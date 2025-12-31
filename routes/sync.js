@@ -1,6 +1,7 @@
 import express from 'express';
 import { NasaSyncService } from '../services/nasaSyncService.js';
 import { SchedulerService } from '../services/schedulerService.js';
+import { authenticateAdmin } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -36,13 +37,24 @@ router.get('/status', async (req, res) => {
 
 /**
  * POST /api/sync/run
- * Trigger immediate manual synchronization
+ * Trigger immediate manual synchronization (requires admin authentication)
+ * 
+ * Query params:
+ * - full: boolean (optional) - Force full sync instead of incremental
  */
-router.post('/run', async (req, res) => {
+router.post('/run', authenticateAdmin, async (req, res) => {
     try {
-        console.log('🚀 Manual synchronization triggered...');
+        const { full } = req.query;
+        const forceFullSync = full === 'true' || full === '1';
         
-        const stats = await SchedulerService.runSyncNow();
+        console.log(`🚀 Manual synchronization triggered by admin: ${req.user.username}`);
+        if (forceFullSync) {
+            console.log('🔄 Full synchronization mode requested');
+        } else {
+            console.log('🔄 Incremental synchronization mode (will resume if needed)');
+        }
+        
+        const stats = await SchedulerService.runSyncNow(forceFullSync);
         
         res.json({
             success: true,
@@ -73,9 +85,9 @@ router.post('/run', async (req, res) => {
 
 /**
  * POST /api/sync/scheduler/start
- * Start automatic scheduler
+ * Start automatic scheduler (requires admin authentication)
  */
-router.post('/scheduler/start', (req, res) => {
+router.post('/scheduler/start', authenticateAdmin, (req, res) => {
     try {
         SchedulerService.startHourlySync();
         
@@ -97,9 +109,9 @@ router.post('/scheduler/start', (req, res) => {
 
 /**
  * POST /api/sync/scheduler/stop
- * Stop automatic scheduler
+ * Stop automatic scheduler (requires admin authentication)
  */
-router.post('/scheduler/stop', (req, res) => {
+router.post('/scheduler/stop', authenticateAdmin, (req, res) => {
     try {
         SchedulerService.stopHourlySync();
         
@@ -121,9 +133,9 @@ router.post('/scheduler/stop', (req, res) => {
 
 /**
  * POST /api/sync/scheduler/restart
- * Restart the automatic scheduler
+ * Restart the automatic scheduler (requires admin authentication)
  */
-router.post('/scheduler/restart', (req, res) => {
+router.post('/scheduler/restart', authenticateAdmin, (req, res) => {
     try {
         SchedulerService.restartHourlySync();
         
@@ -145,10 +157,10 @@ router.post('/scheduler/restart', (req, res) => {
 
 /**
  * POST /api/sync/scheduler/configure
- * Configure a custom schedule
+ * Configure a custom schedule (requires admin authentication)
  * 
  */
-router.post('/scheduler/configure', (req, res) => {
+router.post('/scheduler/configure', authenticateAdmin, (req, res) => {
     try {
         const { cronPattern, timezone = 'Europe/Paris' } = req.body;
         

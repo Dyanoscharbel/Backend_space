@@ -6,7 +6,12 @@ import { connectToDatabase, closeDatabase } from './config/database.js';
 import exoplanetsRoutes from './routes/exoplanets.js';
 import syncRoutes from './routes/sync.js';
 import chatRoutes from './routes/chat.js';
+import authRoutes from './routes/auth.js';
+import messagesRoutes from './routes/messages.js';
+import usersRoutes from './routes/users.js';
 import { GeminiChatbotService } from './services/geminiChatbotService.js';
+import { AuthService } from './services/authService.js';
+import { EmailService } from './services/emailService.js';
 
 dotenv.config();
 
@@ -18,19 +23,23 @@ app.use(helmet());
 app.use(cors({
   origin: [
     'https://nyx-a-ifront-q25a.vercel.app',
-    'https://visualize3-d.vercel.app','http://localhost:3000/'
+    'https://visualize3-d.vercel.app',
+    'http://localhost:3000'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' })); // Augmenter la limite pour les images base64
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/exoplanets', exoplanetsRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/messages', messagesRoutes);
+app.use('/api/users', usersRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -64,6 +73,13 @@ const startServer = async () => {
         // Connect to MongoDB
         await connectToDatabase();
         
+        // Initialize Admin User
+        try {
+            await AuthService.initializeAdminUser();
+        } catch (error) {
+            console.error('⚠️ Warning: Admin initialization failed:', error.message);
+        }
+        
         // Initialize Gemini AI Chatbot
         try {
             GeminiChatbotService.initialize();
@@ -71,6 +87,14 @@ const startServer = async () => {
         } catch (error) {
             console.error('⚠️ Warning: Gemini AI initialization failed:', error.message);
             console.error('💡 Chatbot functionality will not be available');
+        }
+        
+        // Initialize Email Service
+        try {
+            await EmailService.initialize();
+        } catch (error) {
+            console.error('⚠️ Warning: Email service initialization failed:', error.message);
+            console.error('💡 Email notifications will not be available');
         }
         
         // Start Express server

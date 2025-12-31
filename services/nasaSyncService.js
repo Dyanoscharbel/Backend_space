@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getDatabase } from '../config/database.js';
+import { EmailService } from './emailService.js';
 
 export class NasaSyncService {
     
@@ -451,17 +452,122 @@ export class NasaSyncService {
     }
     
     /**
-     * Synchronizes KOI data with the NASA API
+     * Get the last successful synchronization log
+     * @returns {Promise<Object|null>} Last sync log or null
+     */
+    static async getLastSuccessfulSync() {
+        try {
+            const db = getDatabase();
+            const collection = db.collection('sync_logs');
+            
+            const lastSync = await collection
+                .findOne(
+                    { success: true },
+                    { sort: { startTime: -1 } }
+                );
+            
+            if (lastSync) {
+                console.log(`📋 Last successful sync: ${lastSync.startTime.toISOString()}`);
+                console.log(`   - Total processed: ${lastSync.totalFromNASA}`);
+                console.log(`   - New KOIs: ${lastSync.newKOIs}`);
+            } else {
+                console.log('📋 No previous successful synchronization found');
+            }
+            
+            return lastSync;
+            
+        } catch (error) {
+            console.error('❌ Error retrieving last sync:', error);
+            return null;
+        }
+    }
+    
+    /**
+     * Get KOIs that were being processed during the last sync
+     * @param {Object} lastSync - Last sync log
+     * @returns {Promise<Set>} Set of kepoi_names that were successfully processed
+     */
+    static async getProcessedKOIsFromLastSync(lastSync) {
+        try {
+            if (!lastSync || !lastSync.startTime) {
+                return new Set();
+            }
+            
+            const db = getDatabase();
+            const collection = db.collection('koi_objects');
+            
+            // Get all KOIs that were synced after the last sync started
+            const processedKOIs = await collection
+                .find(
+                    {
+                        sync_date: { $gte: lastSync.startTime }
+                    },
+                    { projection: { kepoi_name: 1, _id: 0 } }
+                )
+                .toArray();
+            
+            const processedSet = new Set(
+                processedKOIs
+                    .map(koi => koi.kepoi_name)
+                    .filter(name => name)
+            );
+            
+            console.log(`📋 Found ${processedSet.size} KOIs processed in last sync`);
+            return processedSet;
+            
+        } catch (error) {
+            console.error('❌ Error retrieving processed KOIs:', error);
+            return new Set();
+        }
+    }
+    
+    /**
+     * Synchronizes KOI data with the NASA API (INCREMENTAL VERSION)
+     * Resumes from where the last synchronization stopped
+     * @param {boolean} forceFullSync - Force full sync instead of incremental
      * @returns {Promise<Object>} Synchronization statistics
      */
-    static async synchronizeKOIData() {
+    static async synchronizeKOIData(forceFullSync = false) {
         const startTime = Date.now();
         console.log('🚀 Starting synchronization with NASA API...');
         
+        // Check if this is an incremental sync
+        let lastSync = null;
+        let processedInLastSync = new Set();
+        let resumeMode = false;
+        
+        if (!forceFullSync) {
+            lastSync = await this.getLastSuccessfulSync();
+            
+            // Check if last sync was recent (less than 24 hours ago)
+            if (lastSync) {
+                const lastSyncTime = new Date(lastSync.startTime);
+                const hoursSinceLastSync = (Date.now() - lastSyncTime.getTime()) / (1000 * 60 * 60);
+                
+                // If last sync was within 24 hours and had new KOIs, we might be resuming
+                if (hoursSinceLastSync < 24 && lastSync.newKOIs > 0) {
+                    processedInLastSync = await this.getProcessedKOIsFromLastSync(lastSync);
+                    
+                    if (processedInLastSync.size > 0 && processedInLastSync.size < lastSync.newKOIs) {
+                        resumeMode = true;
+                        console.log('🔄 RESUME MODE ACTIVATED - Continuing from last interrupted sync');
+                        console.log(`   - Last sync started: ${lastSyncTime.toISOString()}`);
+                        console.log(`   - Already processed: ${processedInLastSync.size}/${lastSync.newKOIs} KOIs`);
+                        console.log(`   - Remaining: ${lastSync.newKOIs - processedInLastSync.size} KOIs`);
+                    }
+                }
+            }
+        } else {
+            console.log('🔄 FULL SYNC MODE - Forcing complete synchronization');
+        }
+        
         const stats = {
             startTime: new Date(),
+            resumeMode: resumeMode,
+            lastSyncReference: lastSync ? lastSync.startTime : null,
             totalFromNASA: 0,
             newKOIs: 0,
+            skippedFromLastSync: 0,
             confirmed: 0,
             falsePositive: 0,
             candidates: 0,
@@ -491,14 +597,48 @@ export class NasaSyncService {
             stats.newKOIs = newKepOIEntries.length;
             console.log(`🆕 ${newKepOIEntries.length} new KOIs detected`);
             
-            if (newKepOIEntries.length === 0) {
+            // If in resume mode, filter out KOIs already processed in the last sync
+            let koiToProcess = newKepOIEntries;
+            if (resumeMode && processedInLastSync.size > 0) {
+                koiToProcess = newKepOIEntries.filter(entry => 
+                    !processedInLastSync.has(entry.kepoi_name)
+                );
+                
+                stats.skippedFromLastSync = newKepOIEntries.length - koiToProcess.length;
+                console.log(`⏭️  Skipping ${stats.skippedFromLastSync} KOIs already processed in last sync`);
+                console.log(`📋 ${koiToProcess.length} KOIs remaining to process`);
+            }
+            
+            if (koiToProcess.length === 0) {
                 console.log('✅ No new KOIs to process');
                 stats.duration = Date.now() - startTime;
+                
+                // Envoyer une notification email aux utilisateurs même s'il n'y a pas de nouveaux KOIs
+                try {
+                    console.log('\n📧 Sending email notifications to users...');
+                    const emailResult = await EmailService.sendSyncNotification({
+                        ...stats,
+                        status: 'success',
+                        confirmedPlanets: stats.confirmed,
+                        processed: stats.newKOIs
+                    }, forceFullSync ? 'manual' : 'automatic');
+                    
+                    if (emailResult) {
+                        stats.emailNotification = emailResult;
+                        console.log(`✅ Email notification completed: ${emailResult.successful}/${emailResult.total} sent`);
+                    } else {
+                        console.log('ℹ️  Email notification skipped (service not configured)');
+                    }
+                } catch (emailError) {
+                    console.error('❌ Error sending email notification:', emailError.message);
+                    stats.emailNotificationError = emailError.message;
+                }
+                
                 return stats;
             }
             
             // 4. Process each new KOI according to its status
-            for (const kepOIEntry of newKepOIEntries) {
+            for (const kepOIEntry of koiToProcess) {
                 try {
                     const disposition = kepOIEntry.koi_disposition?.toUpperCase();
                     const kepoi_name = kepOIEntry.kepoi_name;
@@ -579,8 +719,13 @@ export class NasaSyncService {
             stats.duration = Date.now() - startTime;
             
             console.log('✅ Synchronization completed:');
+            if (resumeMode) {
+                console.log(`   🔄 RESUME MODE - Continued from previous sync`);
+                console.log(`   ⏭️  Skipped (already processed): ${stats.skippedFromLastSync}`);
+            }
             console.log(`   - Total from NASA: ${stats.totalFromNASA}`);
             console.log(`   - New: ${stats.newKOIs}`);
+            console.log(`   - Processed in this run: ${koiToProcess.length}`);
             console.log(`   - Confirmed: ${stats.confirmed} → MongoDB`);
             console.log(`   - False Positives: ${stats.falsePositive} → MongoDB`);
             console.log(`   - Candidates: ${stats.candidates} total`);
@@ -601,6 +746,27 @@ export class NasaSyncService {
                     const duration = error.duration ? `${error.duration}ms` : 'N/A';
                     console.log(`   - ${error.kepoi_name}: ${error.error} (${duration})`);
                 });
+            }
+            
+            // Envoyer une notification email aux utilisateurs
+            try {
+                console.log('\n📧 Sending email notifications to users...');
+                const emailResult = await EmailService.sendSyncNotification({
+                    ...stats,
+                    status: 'success',
+                    confirmedPlanets: stats.confirmed,
+                    processed: stats.newKOIs
+                }, forceFullSync ? 'manual' : 'automatic');
+                
+                if (emailResult) {
+                    stats.emailNotification = emailResult;
+                    console.log(`✅ Email notification completed: ${emailResult.successful}/${emailResult.total} sent`);
+                } else {
+                    console.log('ℹ️  Email notification skipped (service not configured)');
+                }
+            } catch (emailError) {
+                console.error('❌ Error sending email notification:', emailError.message);
+                stats.emailNotificationError = emailError.message;
             }
             
             return stats;
