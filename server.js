@@ -98,11 +98,11 @@ const startServer = async () => {
         }
         
         // Start Express server
-        app.listen(PORT, () => {
-            console.log(`🚀 Exoplanets API Server running on http://localhost:${PORT}`);
-            console.log(`🏥 Health check: http://localhost:${PORT}/health`);
-            console.log(`🌌 Exoplanets API: http://localhost:${PORT}/api/exoplanets/system/Kepler-257`);
-            console.log(`🤖 Chatbot API: http://localhost:${PORT}/api/chat/send`);
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log(`🚀 Exoplanets API Server running on port ${PORT}`);
+            console.log(`🏥 Health check: /health`);
+            console.log(`🌌 Exoplanets API: /api/exoplanets/system/Kepler-257`);
+            console.log(`🤖 Chatbot API: /api/chat/send`);
         });
         
     } catch (error) {
